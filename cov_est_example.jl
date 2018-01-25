@@ -1,3 +1,16 @@
+# Create and solve an instance of the covariance estimation problem, with objective function:
+#
+# F(X) =  (1/n) * ∑_{i=1}^{n} | < XX^T , a_{2i} a_{2i}^T - a_{2i-1} a_{2i-1}^T > - (b_{2i} - b_{2i-1}) |
+#         = (1/n) * ∑_{i=1}^n | trace( X X^T C_i ) - e_i |
+#
+# where the measurement vectors a_1, ... , a_m are encoded as the rows
+# of an (m x r) matrix A, and m=2n is even. With no measurement noise,
+# b_j = < a_j a_j^T , XX^T > for j = 1, ... , m.
+#
+# The optimal XX^T is a rank r approximation of the covariance matrix, and X is (d x r).
+#
+# Kellie J. MacPhee
+
 using PyPlot
 
 #--------------------------------------------------------------------
@@ -5,58 +18,52 @@ using PyPlot
 #--------------------------------------------------------------------
 
 iterMax    = 500;
-tol        = 1e-10;
-normalizeA = false;
-init_sol   = false;
 
-m  = 2000;      # row number
-n  = 500;       # col number
-σ  = 0.0;      # noise level added to b
-exp_num = 1;
+m  = 200;      # number of measurements
+d  = 50;       # ambient dimension
+r = 5;           # rank
+σ  = 0.0;      # noise level in observations
+
+init_radius = 0.01;     # normalized distance between initial estimate and true solution
 
 #--------------------------------------------------------------------
-#   Objective funtion
+#   Objective funtion and subgradients
 #--------------------------------------------------------------------
-# include("../func.jl");
+include("cov_est_func.jl");
 
 #--------------------------------------------------------------------
 #   Generate Data
 #--------------------------------------------------------------------
-for i=1:exp_num
 
 srand(123);
-A  = randn(m,n);
-if normalizeA
-    nA = map!(sqrt,sumabs2(A,2));
-    broadcast!(/,A,A,nA);
+A  = randn(m,d);  # change this so measurement vectors (rows) are gaussian
+
+Xtrue = rand(d,r);
+
+b = zeros(m,1);
+for i=1:m
+    b[i] = (A[i,:]' * Xtrue * Xtrue' * A[i,:])[1];
 end
-xt = randn(n);
-b  = map!((x) -> x^2 + σ*rand(), A*xt);
-AT = A.';
-
-ρ=norm(A)^2/m;
-
+noise = rand(m,1);      # change this so noise is gaussian, too? right now σ=0.0 so doesn't really matter
+b = b + σ*noise;
 
 #--------------------------------------------------------------------
 #  Initialization
 #--------------------------------------------------------------------
 
+pert = rand(d,r);       # make gaussian instead?
 
-
-
+X0 = Xtrue + init_radius * vecnorm(Xtrue) * pert ./ vecnorm(pert) ;     # so that || X0- Xtrue ||_F / || X_true ||_F = init_radius
 
 #--------------------------------------------------------------------
 #  Apply Solver
 #--------------------------------------------------------------------
 
-x = copy(xin);
+(Xest, obj, subgrad) = solve_cov_est( A, b, X0; OptVal=0.0, iter_max=iterMax, step="Polyak");       # no noise, Polyak step
 
-#err_his = solve_sign_retrieval(x, xt, A, AT, b);
-
-err_his = solve_sign_retrieval_decay(x, xt, A, AT, b, ρ, 0.06, 10000)
 
 #--------------------------------------------------------------------
-#  Plot
+#  Plot convergence
 #--------------------------------------------------------------------
 
 #z=linspace(0,length(err_his)-1,length(err_his));
