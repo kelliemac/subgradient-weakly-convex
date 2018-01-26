@@ -3,15 +3,16 @@
 #
 # Kellie J. MacPhee
 #
-# Input: A = n x d measurement matrix (rows a1 ... an are the measurement vectors)
-#        b = n - dim vector of observations
-#        X0 = d x r matrix initilization
-#
+# Input: A = m x d measurement matrix (rows a1 ... an are the measurement vectors)
+#           b = m-dim vector of observations
+#         X0 = d x r matrix initilization
+#       gopt = optimal value of problem (for Polyak step)
+#       step = Polyak, constant, .... (right now only supports Polyak)
 
 
 # Returns: optimal X
 
-function solve_cov_est( A, b, X0; OptVal = 0.0, iter_max=500, step="Polyak")
+function solve_cov_est( A, b, X0, Xtrue; OptVal= 0.0, iter_max=500, step="Polyak")
 
     # Take in problem data:
     (m, d) = size(A);
@@ -28,27 +29,34 @@ function solve_cov_est( A, b, X0; OptVal = 0.0, iter_max=500, step="Polyak")
     # Initialize:
     k = 0;
     Xk = copy(X0);
+    (gk, Vk) = cov_est_func( C, e, Xk);
+
+    # Allocate space to keep track of objective values and relative errors:
+    obj_hist = fill(NaN, iterMax);
+    err_hist =  fill(NaN, iterMax);
 
     while k < iter_max
-
-        # Compute objective value gk and subgradient Vk:
-        (gk, Vk) = cov_est_func( C, e, Xk);
-
-        # If subgradient is zero, exit.
+        # If subgradient is zero, done.
         if Vk==0
             return Xk
         end
 
         # Otherwise, take a step:
-        if step="Polyak"
-            αk = (gk-gopt)/vecnorm(Vk)^2;
+        if step=="Polyak"
+            αk = (gk - OptVal) / vecnorm(Vk)^2;
         end
-        Xk = Xk - α * Vk;
+        Xk = Xk - αk * Vk;
+
+        # Compute new objective value gk and subgradient Vk:
+        (gk, Vk) = cov_est_func( C, e, Xk);
         k = k + 1;
+
+        # Record objective value and relative error:
+        obj_hist[k] = gk;
+        err_hist[k] = vecnorm(Xk-Xtrue)/vecnorm(Xtrue);
 
     end
 
-(gk, Vk) = cov_est_func( C, e, Xk);
-return (Xk, gk, Vk)
+return (Xk, obj_hist, err_hist)
 
 end

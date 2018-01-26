@@ -41,7 +41,7 @@ function cov_est_func( C, e, X)
         SUBGRAD = zeros(size(X));
         for k=1:d
             for l=1:r
-                temp = 2 * X[:,l]' * C[:,:,k] * outer_subgrad;
+                temp = 2 * X[:,l]' * C[:,k,:] * outer_subgrad;
                 SUBGRAD[k,l] = temp[1];
             end
         end

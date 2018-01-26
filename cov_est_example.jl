@@ -12,6 +12,7 @@
 # Kellie J. MacPhee
 
 using PyPlot
+using Distributions
 
 #--------------------------------------------------------------------
 #   Parameters
@@ -20,23 +21,26 @@ using PyPlot
 iterMax    = 500;
 
 m  = 200;      # number of measurements
-d  = 50;       # ambient dimension
-r = 5;           # rank
+d  = 100;       # ambient dimension
+r = 10;           # rank
 σ  = 0.0;      # noise level in observations
 
 init_radius = 0.01;     # normalized distance between initial estimate and true solution
 
 #--------------------------------------------------------------------
-#   Objective funtion and subgradients
+#   Objective funtion and subgradients, solver
 #--------------------------------------------------------------------
 include("cov_est_func.jl");
+include("solve_cov_est.jl")
 
 #--------------------------------------------------------------------
 #   Generate Data
 #--------------------------------------------------------------------
-
+distrib = MvNormal(d, 1.0);
 srand(123);
-A  = randn(m,d);  # change this so measurement vectors (rows) are gaussian
+
+A = (rand(distrib, m))' ;
+#A  = randn(m,d);  # change this so measurement vectors (rows) are gaussian
 
 Xtrue = rand(d,r);
 
@@ -59,21 +63,23 @@ X0 = Xtrue + init_radius * vecnorm(Xtrue) * pert ./ vecnorm(pert) ;     # so tha
 #  Apply Solver
 #--------------------------------------------------------------------
 
-(Xest, obj, subgrad) = solve_cov_est( A, b, X0; OptVal=0.0, iter_max=iterMax, step="Polyak");       # no noise, Polyak step
+(Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iter_max=iterMax, step="Polyak");       # no noise, Polyak step
 
 
 #--------------------------------------------------------------------
-#  Plot convergence
+#  Plot convergence (distance to optimum and objective value)
 #--------------------------------------------------------------------
 
-#z=linspace(0,length(err_his)-1,length(err_his));
-#semilogy(z,err_his);
 clf();
 xlabel(L"Iteration $k$");
-ylabel(L"$\|x_k-\bar x\|$");
-semilogy(err_his);
+ylabel(L"$\|X_k-\bar X\|_F / \|\bar X\|_F$");
+title("Relative distance to optimum")
+plot(err_hist);
 savefig("error.pdf");
 
-
- m=convert(Int64,ceil(m+0.25*n));
-end
+clf();
+xlabel(L"Iteration $k$");
+ylabel(L"$F(X_k)$");
+title("Objective value")
+semilogy(obj_hist);
+savefig("objectives.pdf");
