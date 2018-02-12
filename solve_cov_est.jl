@@ -8,55 +8,84 @@
 #         X0 = d x r matrix initilization
 #       gopt = optimal value of problem (for Polyak step)
 #       step = Polyak, constant, .... (right now only supports Polyak)
+#       stepSize = size for constant step
 
+# Returns: optimal X, error history,
 
-# Returns: optimal X
+include("cov_est_func.jl");
 
-function solve_cov_est( A, b, X0, Xtrue; OptVal= 0.0, iter_max=500, step="Polyak")
+function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-10,
+    OptVal::Float64=0.0, step::String="Polyak",
+    stepSize::Float64=1.0,
+    μ::Float64=0.0, L::Float64=1e10, ρ::Float64=1e10)
 
     # Take in problem data:
-    (m, d) = size(A);
-    (d2, r) = size(X0);
-    (C, e) = transform_data(A, b);
+    (d, m) = size(A);
+    n = convert(Int64, m/2);
+    r = size(X0,2);
+    normXtrue = vecnorm(Xtrue);
 
-    # # Throw errors if input is unacceptable:
-    # if d2 != d
-    #     throw(DimensionMismatch("sizes of A and X0 do not match"))
-    # elseif length(b) != n
-    #     throw(DimensionMismatch("sizes of A and b do not match"))
-    # end
-
-    # Initialize:
+    # Initialize and pre-allocate space:
     k = 0;
-    Xk = copy(X0);
-    (gk, Vk) = cov_est_func( C, e, Xk);
+    Xk = copy(X0);           # current iterate
+    XT = Xk.';
+
+    res = zeros(n,1);        # residuals, use for objective value
+    cov_residuals!(res,A,b,XT,n);
+    signs = sign.(res);    # transposed signs of residuals, use for subgradient
+
+    gk = cov_objective(res,n); # objective value
+    Vk = zeros(d,r); # current subgradient
+    AT = A.';
+    subgrad!(Vk, A, signs, Xk, n);
+
+    # If constant step size chosen, set now.
+    if step=="Constant"
+        αk = stepSize;
+    elseif step=="Decay"
+        δ=0.2;
+        κ=μ/L;
+        q=sqrt(1-(1-δ)*κ^2);
+        α0 = (δ*μ^2/(ρ*L));
+    end
 
     # Allocate space to keep track of objective values and relative errors:
     obj_hist = fill(NaN, iterMax);
+    err = 0.0;
     err_hist =  fill(NaN, iterMax);
 
     while k < iter_max
         # If subgradient is zero, done.
-        if Vk==0
+        if norm(Vk) <= Tol
             return Xk
         end
 
-        # Otherwise, take a step:
+        # Otherwise, update Xk (if step not Polyak, assume constant):
         if step=="Polyak"
-            αk = (gk - OptVal) / vecnorm(Vk)^2;
+            αk = (gk - OptVal) / sum(abs2, Vk);
+        elseif step=="Decay"
+            αk = α0*q^k;
         end
-        Xk = Xk - αk * Vk;
+        BLAS.axpy!( -αk, Vk, Xk);
 
         # Compute new objective value gk and subgradient Vk:
-        (gk, Vk) = cov_est_func( C, e, Xk);
+        transpose!(XT,Xk);
+        cov_residuals!(res,A,b,XT,n);
+        signs = sign.(res);
+        gk = cov_objective(res,n);
+        subgrad!(Vk, A, signs, Xk, n)
         k = k + 1;
 
         # Record objective value and relative error:
         obj_hist[k] = gk;
-        err_hist[k] = vecnorm(Xk-Xtrue)/vecnorm(Xtrue);
+        err = vecnorm(Xk-Xtrue)/normXtrue;
+        err_hist[k] = err;
+
+        # Print output to the console:
+        @printf("iter %3d, obj %1.2e, err %1.2e, step %1.2e\n", k, gk, err, αk);
 
     end
 
-return (Xk, obj_hist, err_hist)
+    return (Xk, obj_hist, err_hist)
 
 end
