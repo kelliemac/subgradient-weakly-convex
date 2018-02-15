@@ -32,12 +32,11 @@ function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-10,
 
     res = zeros(n,1);        # residuals, use for objective value
     cov_residuals!(res,A,b,XT,n);
-    signs = sign.(res);    # transposed signs of residuals, use for subgradient
 
-    gk = cov_objective(res,n); # objective value
-    Vk = zeros(d,r); # current subgradient
-    AT = A.';
-    subgrad!(Vk, A, signs, Xk, n);
+    gk = cov_objective(res,n);  # objective value
+    Vk = zeros(d,r);    # current subgradient
+    gradGi = zeros(d,r);     # to help with computing subgradient
+    subgrad!(Vk, gradGi, A, res, Xk, n);
 
     # If constant step size chosen, set now.
     if step=="Constant"
@@ -71,10 +70,9 @@ function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-10,
         # Compute new objective value gk and subgradient Vk:
         transpose!(XT,Xk);
         cov_residuals!(res,A,b,XT,n);
-        signs = sign.(res);
         gk = cov_objective(res,n);
-        subgrad!(Vk, A, signs, Xk, n)
-        k = k + 1;
+        subgrad!(Vk, gradGi, A, res, Xk, n)
+        k = k + 1;  # number of rounds completed
 
         # Record objective value and relative error:
         obj_hist[k] = gk;
