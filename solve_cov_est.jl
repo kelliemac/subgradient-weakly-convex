@@ -14,7 +14,7 @@
 
 include("cov_est_func.jl");
 
-function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-10,
+function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-15,
     OptVal::Float64=0.0, step::String="Polyak",
     stepSize::Float64=1.0,
     μ::Float64=0.0, L::Float64=1e10, ρ::Float64=1e10)
@@ -56,7 +56,7 @@ function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-10,
     while k < iter_max
         # If subgradient is zero, done.
         if norm(Vk) <= Tol
-            return Xk
+            break
         end
 
         # Otherwise, update Xk (if step not Polyak, assume constant):
@@ -76,11 +76,16 @@ function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-10,
 
         # Record objective value and relative error:
         obj_hist[k] = gk;
-        err = vecnorm(Xk-Xtrue)/normXtrue;
+        err = normXtrue^2 + sum(abs2, Xk) - 2 * sum(svdvals(XT * Xtrue));
+        err = err/(normXtrue^2);
         err_hist[k] = err;
 
         # Print output to the console:
         @printf("iter %3d, obj %1.2e, err %1.2e, step %1.2e\n", k, gk, err, αk);
+
+        if err <= Tol
+            break
+        end
 
     end
 

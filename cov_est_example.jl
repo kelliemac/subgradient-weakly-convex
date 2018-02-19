@@ -14,19 +14,14 @@
 workspace()
 
 using PyPlot
-# using Distributions       # for multivariate normal random vectors
-#using Base.Profile
-#using ProfileView
 
 #--------------------------------------------------------------------
 #   Parameters
 #--------------------------------------------------------------------
-
-iterMax    = 1000;
-
-m  = 500;      # number of measurements (need m>2d)
-d  = 100;       # ambient dimension
-r = 1;           # rank
+iterMax    = 100;
+m  = 5000;      # number of measurements (need m>2d)
+d  = 1000;       # ambient dimension
+r = 2;           # rank
 σ  = 0.0;      # noise level in observations
 
 #--------------------------------------------------------------------
@@ -38,16 +33,12 @@ include("solve_cov_est.jl");
 #--------------------------------------------------------------------
 #   Generate Data
 #--------------------------------------------------------------------
-# distrib = MvNormal(d, 1.0);
 srand(123);
-
-# A = (rand(distrib, m)) ;  # columns are measurement vectors - gaussian
 A  = randn(d,m); # columns are measurement vectors, entries are iid N(0,1)
 
 Xtrue = randn(d,r);
 XTtrue = Xtrue.';
 
-# b = zeros(m,1);
 b = mapslices( x -> sum( abs2, XTtrue * x ) , A, [1])';  # slow
 noise = randn(m,1);
 b = b + σ*noise;
@@ -67,11 +58,10 @@ X0 = Xtrue + (init_radius  / vecnorm(pert) )* pert ;     # so that || X0- Xtrue 
 #  Apply Solver
 #--------------------------------------------------------------------
 
-(Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iter_max=iterMax, step="Polyak");      # no noise, Polyak step
-norm(Xest-Xtrue)/norm(Xtrue)
+# (Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iter_max=iterMax, step="Polyak");      # no noise, Polyak step
 
-# α = 0.1/norm(A)^2;
-# (Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iter_max=iterMax, step="Constant", stepSize=α);      # no noise, constant step
+α = 0.1/norm(A)^2;
+(Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iter_max=iterMax, step="Constant", stepSize=α);      # no noise, constant step
 
 # I don't actually know what  these parameters should be, so I can't make this converge,
 # but you can fill in μ and L and ρ and run the decaying step, too:
@@ -83,8 +73,9 @@ norm(Xest-Xtrue)/norm(Xtrue)
 
 clf();
 xlabel(L"Iteration $k$");
-ylabel(L"$\|X_k-\bar X\|_F / \|\bar X\|_F$");
-title("Relative distance to optimum")
+ylabel(L"$ \min_{\Omega} \quad || \Omega X_k-\bar X ||^2 \; / \;  || \bar X ||^{2}$");
+title("Relative distance to solution set")
+
 semilogy(err_hist);
 savefig("error.pdf");
 
