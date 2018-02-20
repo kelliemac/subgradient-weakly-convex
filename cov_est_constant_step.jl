@@ -8,7 +8,7 @@ include("solve_cov_est.jl");
 #   Parameters
 #--------------------------------------------------------------------
 
-iterMax  = 500;
+iterMax  = 1500;
 m  = 5000;      # number of measurements (need m>2d)
 d  = 1000;       # ambient dimension
 r = 2;           # rank
@@ -42,14 +42,15 @@ xlabel(L"Iteration $k$");
 ylabel(L"$ \min_{\Omega} \quad || \Omega X_k-\bar X ||^2 \; / \;  || \bar X ||^{2}$");
 # title("Relative distance to solution set (Constant step)")
 
-αVals = [1e-3, 5e-4, 1e-4, 5e-5]; #[1.0, 1/3, 1/9];
+αVals =[1e-3, 5e-4, 1e-4, 5e-5]; #[1.0, 1/3, 1/9];
 
 for α in αVals
         #--------------------------------------------------------------------
         #  Solve and add to plot
         #--------------------------------------------------------------------
          (Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iter_max=iterMax, step="Constant", stepSize=α);      # no noise, Polyak step
-        semilogy(err_hist);
+        semilogy(err_hist, label=(L"α="*string(α)));
 end
 
+legend();
 savefig("constant_step_error.pdf");
