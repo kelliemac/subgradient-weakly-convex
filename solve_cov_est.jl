@@ -40,7 +40,7 @@ function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-15,
 
     # If constant step size chosen, set now.
     if step=="Constant"
-        αk = stepSize;
+        α = stepSize;
     elseif step=="Decay"
         δ=0.2;
         κ=μ/L;
@@ -55,15 +55,17 @@ function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-15,
 
     while k < iter_max
         # If subgradient is zero, done.
-        if norm(Vk) <= Tol
+        if norm(Vk) <= 1e-14
             break
         end
 
         # Otherwise, update Xk (if step not Polyak, assume constant):
         if step=="Polyak"
             αk = (gk - OptVal) / sum(abs2, Vk);
+        elseif step=="Constant"
+            αk = α / vecnorm(Vk);
         elseif step=="Decay"
-            αk = α0*q^k;
+            αk = ( α0 / vecnorm(Vk) ) * q^k;
         end
         BLAS.axpy!( -αk, Vk, Xk);
 
@@ -77,7 +79,7 @@ function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-15,
         # Record objective value and relative error:
         obj_hist[k] = gk;
         err = normXtrue^2 + sum(abs2, Xk) - 2 * sum(svdvals(XT * Xtrue));
-        err = err/(normXtrue^2);
+        err = sqrt(err)/normXtrue;
         err_hist[k] = err;
 
         # Print output to the console:
