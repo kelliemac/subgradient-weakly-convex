@@ -9,7 +9,8 @@ include("solve_cov_est.jl");
 #--------------------------------------------------------------------
 
 iterMax  = 500;
-mVals  = [5000, 8000, 11000, 14000, 17000, 20000];      # number of measurements (need m>2d)
+mVals = [5000];
+# mVals  = [5000, 8000, 11000, 14000, 17000, 20000];      # number of measurements (need m>2d)
 d  = 1000;       # ambient dimension
 r = 3;           # rank
 
