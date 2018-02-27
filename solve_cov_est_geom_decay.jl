@@ -3,9 +3,11 @@
 #       b: m-vector of observations
 #       X0: (d x r) matrix to initalize algorithm
 #       Xtrue: (d x r) matrix that we want to converge to
-#       stepSize
-#       IterMax
+#       ρ: weak convexity constant
+#       L: Lipschitz constant of gradients
+#       μ: sharpness constant
 #       Tol: tolerance for exiting algorithm based on norm of subgradient
+#       δ: between 0 and 1, controls convergence rate
 
 # Outputs:
 #       Xk: final estimate of Xtrue upon exiting algorithm
@@ -14,8 +16,8 @@
 
 include("cov_est_func.jl");
 
-function solve_cov_est_constant_step( A, b, X0, Xtrue; stepSize::Float64=1.0, iterMax::Int=500,
-    Tol::Float64=1e-15)
+function solve_cov_est_constant_step( A, b, X0, Xtrue, ρ, L, μ; iterMax::Int=500,
+    Tol::Float64=1e-15, δ::Float64=0.2)
 
     # Take in problem data:
     (d, m) = size(A);
@@ -23,7 +25,6 @@ function solve_cov_est_constant_step( A, b, X0, Xtrue; stepSize::Float64=1.0, it
     r = size(X0,2);
     sqnormXtrue = sum(abs2, Xtrue);
     XTtrue = Xtrue.';
-    α = stepSize;
 
     # for coupling the even and odd measurements
     if iseven(m)
@@ -55,7 +56,10 @@ function solve_cov_est_constant_step( A, b, X0, Xtrue; stepSize::Float64=1.0, it
     err = sqrt( err / sqnormXtrue );
     err_hist[k] = err;
 
-    @printf("Starting values: obj %1.2e, err %1.2e, step %1.2e\n", gk, err, α/vecnorm(Vk) );
+    # for step size
+    κ = μ/L;
+    q = sqrt(1-(1-δ)*κ^2);
+    α0 = (δ*μ^2/(ρ*L));
 
     while k < iterMax
         # If subgradient is zero, done.
@@ -64,7 +68,7 @@ function solve_cov_est_constant_step( A, b, X0, Xtrue; stepSize::Float64=1.0, it
         end
 
         # Otherwise, update Xk
-        αk = α/vecnorm(Vk);
+        αk = ( α0 / vecnorm(Vk) ) * q^k;
         BLAS.axpy!( -αk, Vk, Xk);
 
         # Update objective value and subgradient

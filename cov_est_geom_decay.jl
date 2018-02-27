@@ -1,41 +1,70 @@
 workspace()
 
 using PyPlot
-using Distributions
+
 include("cov_est_func.jl");
-include("solve_cov_est.jl");
+include("solve_cov_est_geom_decay.jl");
 
 #--------------------------------------------------------------------
 #   Parameters
 #--------------------------------------------------------------------
 
-iterMax  = 500;
-m  = 3000;      # number of measurements (need m>2d)
+iter_max  = 500;
+m  = 10000;      # number of measurements (need m>2d)
 d  = 1000;       # ambient dimension
-r = 1;           # rank
-σ  = 0.0;      # noise level in observations
+r = 3;           # rank
+pfail = 0.1;        # probabilty of an outlier
+σ = 10.0;        # std dev of outliers
 
 #--------------------------------------------------------------------
 #   Generate Data
 #--------------------------------------------------------------------
 srand(123);
-A  = randn(d,m); # columns are measurement vectors, entries are iid N(0,1)
+A  = randn(m,d).'; # columns are measurement vectors, entries are iid N(0,1)
+
+# Generating outliers - for vector case only right now
+Inc=rand(m,d);
+for j=1:m
+    for k=1:d
+        if Inc[j,k]<pfail
+            Inc[j,k]=1;
+        else
+            Inc[j,1]=0;
+        end
+    end
+end
+Outliers=σ*abs(randn(m));
 
 Xtrue = randn(d,r);
 XTtrue = Xtrue.';
+norm_Xtrue = vecnorm(Xtrue);
 
-distrib = Bernoulli(0.01);
-z = rand(distrib, m);
-distrib2 = Normal(0.0, 1.0);
-ζ = rand(distrib2, m);
+b_temp = mapslices( x -> sum( abs2, XTtrue * x ) , A, [1])';  # slow
+b = (ones(m,d)-Inc) .* b_temp + Inc .* Outliers;
+# b = b_temp;
 
-b = mapslices( x -> sum( abs2, XTtrue * x ) , A, [1])';  # slow
-b = (1-z) .* b + z .* abs(ζ);
+# # FOR TESTING AGAINST SIGN RETRIEVAL: decouple even and odd terms
+# Afull = zeros(d,2*m);
+# for i=1:m
+#     Afull[:,2*i] = A[:,i];
+# end
+#
+# bfull = vec(zeros(2*m,1));
+# for i=1:m
+#     bfull[2*i] = b[i];
+# end
+
+#--------------------------------------------------------------------
+# Parameters based on data
+#--------------------------------------------------------------------
+ρ = 9.0;
+L = 50*norm_Xtrue ;
+μ = 1.0*norm_Xtrue ;
 
 #--------------------------------------------------------------------
 #  Generate initial point
 #--------------------------------------------------------------------
-init_radius = 1.0 * vecnorm(Xtrue);  # should be like gamma * mu / rho. make sure to scale with dimension
+init_radius = 1.0 * norm_Xtrue ;  # should be like gamma * mu / rho. make sure to scale with dimension
 pert = randn(d,r);
 X0 = Xtrue + (init_radius  / vecnorm(pert) )* pert ;     # so that || X0- Xtrue ||_F = init_radius.
 
@@ -46,14 +75,14 @@ clf();
 xlabel(L"Iteration $k$");
 ylabel(L"$dist \, (X_k,\mathcal{X}^*) \; / \;  || \bar X ||_F$");
 
-ρ_est = 9.0;
-L_est = 50.0 * normXtrue;
-μ_est = 0.1 * normXtrue;
+δVals = [0.2, 0.5, 0.8];
 
-#--------------------------------------------------------------------
-#  Solve and add to plot
-#--------------------------------------------------------------------
-(Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iter_max=iterMax, step="Decay", μ= μ_est , L=L_est , ρ=ρ_est );
-semilogy(err_hist);
+for δ in δVals
+        #--------------------------------------------------------------------
+        #  Solve and add to plot
+        #--------------------------------------------------------------------
+         (Xest, obj_hist, err_hist) = solve_cov_est_constant_step( A, b, X0, Xtrue, ρ, L, μ, iterMax=iter_max, δ=δ);
+        semilogy(err_hist);
+end
 
 savefig("geom_decay_error.pdf");

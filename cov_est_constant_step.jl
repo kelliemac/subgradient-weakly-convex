@@ -9,34 +9,49 @@ include("solve_cov_est_constant_step.jl");
 #   Parameters
 #--------------------------------------------------------------------
 
-iter_max  = 10;
-m  = 3000;      # number of measurements (need m>2d)
+iter_max  = 2000;
+m  = 10000;      # number of measurements (need m>2d)
 d  = 1000;       # ambient dimension
-r = 1;           # rank
+r = 3;           # rank
 pfail = 0.1;        # probabilty of an outlier
+σ = 10.0;        # std dev of outliers
 
 #--------------------------------------------------------------------
 #   Generate Data
 #--------------------------------------------------------------------
 srand(123);
-A  = randn(d,m); # columns are measurement vectors, entries are iid N(0,1)
+A  = randn(m,d).'; # columns are measurement vectors, entries are iid N(0,1)
 
 # Generating outliers - for vector case only right now
-Inc=rand(m);
+Inc=rand(m,d);
 for j=1:m
-  if Inc[j,1]<pfail
-    Inc[j,1]=1
-  else
-    Inc[j,1]=0
-  end
+    for k=1:d
+        if Inc[j,k]<pfail
+            Inc[j,k]=1;
+        else
+            Inc[j,1]=0;
+        end
+    end
 end
-Outliers=10*abs(randn(m));
+Outliers=σ*abs(randn(m));
 
 Xtrue = randn(d,r);
 XTtrue = Xtrue.';
 
 b_temp = mapslices( x -> sum( abs2, XTtrue * x ) , A, [1])';  # slow
-b = vec((ones(m,1)-Inc).*b_temp+Inc.*Outliers);
+b = (ones(m,d)-Inc) .* b_temp + Inc .* Outliers;
+# b = b_temp;
+
+# # FOR TESTING AGAINST SIGN RETRIEVAL: decouple even and odd terms
+# Afull = zeros(d,2*m);
+# for i=1:m
+#     Afull[:,2*i] = A[:,i];
+# end
+#
+# bfull = vec(zeros(2*m,1));
+# for i=1:m
+#     bfull[2*i] = b[i];
+# end
 
 #--------------------------------------------------------------------
 #  Generate initial point
@@ -52,7 +67,8 @@ clf();
 xlabel(L"Iteration $k$");
 ylabel(L"$dist \, (X_k,\mathcal{X}^*) \; / \;  || \bar X ||_F$");
 
-αVals =[1.0, 1/3, 1/9];
+# αVals = [1.0, 1/3, 1/9];
+αVals = [1.0, 1/3, 1/9];
 
 for α in αVals
         #--------------------------------------------------------------------
