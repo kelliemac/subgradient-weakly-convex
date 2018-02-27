@@ -43,7 +43,7 @@ for m in mVals
         #--------------------------------------------------------------------
         #  Solve and add to plot
         #--------------------------------------------------------------------
-        (Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iter_max=iterMax, step="Polyak", Tol=1e-7);      # no noise, Polyak step
+        (Xest, obj_hist, err_hist) = solve_cov_est( A, b, X0, Xtrue; OptVal=0.0, iterMax=iter_max);
         semilogy(err_hist);
 
 end

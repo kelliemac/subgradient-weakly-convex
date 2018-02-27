@@ -1,96 +1,94 @@
-# Function to solve covariance estimation problems
-# (for use on synthetic problems for the weakly convex subgradient project)
 #
-# Kellie J. MacPhee
+# Polyak step for subgradient method on covariance estimation
 #
-# Input: A = m x d measurement matrix (rows a1 ... an are the measurement vectors)
-#           b = m-dim vector of observations
-#         X0 = d x r matrix initilization
-#       gopt = optimal value of problem (for Polyak step)
-#       step = Polyak, constant, .... (right now only supports Polyak)
-#       stepSize = size for constant step
-
-# Returns: optimal X, error history,
+# Inputs:
+#       A: (d x m) matrix with measurement vectors as columns
+#       b: m-vector of observations
+#       X0: (d x r) matrix to initalize algorithm
+#       Xtrue: (d x r) matrix that we want to converge to
+#       OptVal: optimal function value (value at Xtrue)
+#       IterMax
+#       Tol: tolerance for exiting algorithm based on norm of subgradient
+#
+# Outputs:
+#       Xk: final estimate of Xtrue upon exiting algorithm
+#       obj_hist: vector of objective values at each stem
+#       err_hist: vector of normalized distances to solution set at each iteration
 
 include("cov_est_func.jl");
 
-function solve_cov_est( A, b, X0, Xtrue; iter_max::Int=500, Tol::Float64=1e-15,
-    OptVal::Float64=0.0, step::String="Polyak",
-    stepSize::Float64=1.0,
-    μ::Float64=0.0, L::Float64=1e10, ρ::Float64=1e10)
+function solve_cov_est( A, b, X0, Xtrue; OptVal::Float64=0.0, iterMax::Int=500,
+    Tol::Float64=1e-15)
 
     # Take in problem data:
     (d, m) = size(A);
-    n = convert(Int64, m/2);
+    AT = A.';
     r = size(X0,2);
-    normXtrue = vecnorm(Xtrue);
+    sqnormXtrue = sum(abs2, Xtrue);
+    XTtrue = Xtrue.';
 
-    # Initialize and pre-allocate space:
-    k = 0;
-    Xk = copy(X0);           # current iterate
-    XT = Xk.';
-
-    res = zeros(n,1);        # residuals, use for objective value
-    cov_residuals!(res,A,b,XT,n);
-
-    gk = cov_objective(res,n);  # objective value
-    Vk = zeros(d,r);    # current subgradient
-    gradGi = zeros(d,r);     # to help with computing subgradient
-    subgrad!(Vk, gradGi, A, res, Xk, n);
-
-    # If constant step size chosen, set now.
-    if step=="Constant"
-        α = stepSize;
-    elseif step=="Decay"
-        δ=0.2;
-        κ=μ/L;
-        q=sqrt(1-(1-δ)*κ^2);
-        α0 = (δ*μ^2/(ρ*L));
+    # for coupling the even and odd measurements
+    if iseven(m)
+        n = convert(Int64, m/2);
+    else
+        throw(ArgumentError("A must have an even number of columns"))
     end
 
-    # Allocate space to keep track of objective values and relative errors:
-    obj_hist = fill(NaN, iterMax);
-    err = 0.0;
-    err_hist =  fill(NaN, iterMax);
+    # Initialize and pre-allocate space for variables
+    k = 1;
+    Xk = copy(X0);           # current iterate
 
-    while k < iter_max
+    # compute residuals
+    S = AT * Xk;    # will reuse this!
+    res = zeros(n,1);
+    cov_residuals!(res,S,b);
+
+    # compute objective value and subgradient
+    gk = cov_objective(res);
+    Vk = zeros(d,r);
+    subgrad!(Vk, A, res, S);
+
+    # Allocate space to keep track of method's progress:
+    obj_hist = fill(NaN, iterMax);
+    obj_hist[k] = gk;
+
+    err_hist =  fill(NaN, iterMax);
+    err = sqnormXtrue + sum(abs2, Xk) - 2 * sum(svdvals(XTtrue * Xk));  # small svd (d x d)
+    err = sqrt( err / sqnormXtrue );
+    err_hist[k] = err;
+
+    @printf("Starting values: obj %1.2e, err %1.2e, step %1.2e\n", gk, err, α/vecnorm(Vk) );
+
+    while k < iterMax
         # If subgradient is zero, done.
-        if norm(Vk) <= 1e-14
+        if norm(Vk) <= Tol
             break
         end
 
-        # Otherwise, update Xk (if step not Polyak, assume constant):
-        if step=="Polyak"
-            αk = (gk - OptVal) / sum(abs2, Vk);
-        elseif step=="Constant"
-            αk = α / vecnorm(Vk);
-        elseif step=="Decay"
-            αk = ( α0 / vecnorm(Vk) ) * q^k;
-        end
+        # Otherwise, update Xk
+        αk = (gk-OptVal)/sum(abs2,Vk);
         BLAS.axpy!( -αk, Vk, Xk);
 
-        # Compute new objective value gk and subgradient Vk:
-        transpose!(XT,Xk);
-        cov_residuals!(res,A,b,XT,n);
-        gk = cov_objective(res,n);
-        subgrad!(Vk, gradGi, A, res, Xk, n)
-        k = k + 1;  # number of rounds completed
+        # Update objective value and subgradient
+        BLAS.gemm!('N', 'N', 1.0, AT, Xk, 0.0, S) # update S = AT * Xk
+        cov_residuals!(res,S,b);
+        gk = cov_objective(res);
+        subgrad!(Vk, A, res, S)
 
-        # Record objective value and relative error:
+        k = k + 1;
+
+        # Record objective value and (normalized) distance to solution set
         obj_hist[k] = gk;
-        err = normXtrue^2 + sum(abs2, Xk) - 2 * sum(svdvals(XT * Xtrue));
-        err = sqrt(err)/normXtrue;
+        err = sqnormXtrue + sum(abs2, Xk) - 2 * sum(svdvals(XTtrue * Xk));  # small svd (d x d)
+        err = sqrt( err / sqnormXtrue );
         err_hist[k] = err;
 
-        # Print output to the console:
+        # Print current status to the console
         @printf("iter %3d, obj %1.2e, err %1.2e, step %1.2e\n", k, gk, err, αk);
-
-        if err <= Tol
-            break
-        end
 
     end
 
+    # Done!
     return (Xk, obj_hist, err_hist)
 
 end

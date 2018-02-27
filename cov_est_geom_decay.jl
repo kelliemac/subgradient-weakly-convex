@@ -9,7 +9,7 @@ include("solve_cov_est_geom_decay.jl");
 #   Parameters
 #--------------------------------------------------------------------
 
-iter_max  = 500;
+iter_max  = 2000;
 m  = 10000;      # number of measurements (need m>2d)
 d  = 1000;       # ambient dimension
 r = 3;           # rank
@@ -75,7 +75,7 @@ clf();
 xlabel(L"Iteration $k$");
 ylabel(L"$dist \, (X_k,\mathcal{X}^*) \; / \;  || \bar X ||_F$");
 
-δVals = [0.2, 0.5, 0.8];
+δVals = [0.5, 0.7, 0.9];
 
 for δ in δVals
         #--------------------------------------------------------------------

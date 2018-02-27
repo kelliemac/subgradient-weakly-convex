@@ -74,7 +74,7 @@ for α in αVals
         #--------------------------------------------------------------------
         #  Solve and add to plot
         #--------------------------------------------------------------------
-         (Xest, obj_hist, err_hist) = solve_cov_est_constant_step( A, b, X0, Xtrue; iterMax=iter_max, stepSize=α);      # no noise, Polyak step
+         (Xest, obj_hist, err_hist) = solve_cov_est_constant_step( A, b, X0, Xtrue; iterMax=iter_max, stepSize=α); 
         semilogy(err_hist);
 end
 
