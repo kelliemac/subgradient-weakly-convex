@@ -58,8 +58,6 @@ b = (ones(m,d)-Inc) .* b_temp + Inc .* Outliers;
 # Parameters based on data
 #--------------------------------------------------------------------
 ρ = 9.0;
-L = 50*norm_Xtrue ;
-μ = 1.0*norm_Xtrue ;
 
 #--------------------------------------------------------------------
 #  Generate initial point
@@ -75,14 +73,22 @@ clf();
 xlabel(L"Iteration $k$");
 ylabel(L"$dist \, (X_k,\mathcal{X}^*) \; / \;  || \bar X ||_F$");
 
-δVals = [0.5, 0.7, 0.9];
+δ = 0.5;
+L0 = 15.0*norm_Xtrue;
+μ0 = 3.5*norm_Xtrue;
 
-for δ in δVals
+c = 0.8;
+μVals = μ0 * [1.0, c, c^2, c^3];  # has to be smaller than L0
+
+κVals = μVals / L0;
+qVals = sqrt.(1-(1-δ)*(κVals.^2));
+
+for i=1:length(μVals)
         #--------------------------------------------------------------------
         #  Solve and add to plot
         #--------------------------------------------------------------------
-         (Xest, obj_hist, err_hist) = solve_cov_est_constant_step( A, b, X0, Xtrue, ρ, L, μ, iterMax=iter_max, δ=δ);
-        semilogy(err_hist);
+        (Xest, obj_hist, err_hist) = solve_cov_est_constant_step( A, b, X0, Xtrue, ρ, L0, μVals[i], iterMax=iter_max, δ=δ, Tol=1e-7);
+        semilogy(err_hist, label=string(qVals[i]) );
 end
 
 savefig("geom_decay_error.pdf");

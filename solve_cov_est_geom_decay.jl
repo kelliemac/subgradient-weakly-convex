@@ -88,6 +88,10 @@ function solve_cov_est_constant_step( A, b, X0, Xtrue, ρ, L, μ; iterMax::Int=5
         # Print current status to the console
         @printf("iter %3d, obj %1.2e, err %1.2e, step %1.2e\n", k, gk, err, αk);
 
+        if err <= Tol
+            break
+        end
+
     end
 
     # Done!
