@@ -78,7 +78,7 @@ L0 = 15.0*norm_Xtrue;
 μ0 = 3.5*norm_Xtrue;
 
 c = 0.8;
-μVals = μ0 * [1.0, c, c^2, c^3];  # has to be smaller than L0
+μVals = μ0 * [1.0, c, c^2, c^3, c^4];  # has to be smaller than L0
 
 κVals = μVals / L0;
 qVals = sqrt.(1-(1-δ)*(κVals.^2));
@@ -91,4 +91,5 @@ for i=1:length(μVals)
         semilogy(err_hist, label=string(qVals[i]) );
 end
 
+@printf("qVals are %1.4f, %1.4f, %1.4f, %1.4f, %1.4f", qVals[1],qVals[2],qVals[3],qVals[4],qVals[5]) ;
 savefig("geom_decay_error.pdf");
